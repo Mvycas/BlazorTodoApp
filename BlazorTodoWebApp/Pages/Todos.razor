@@ -1,0 +1,294 @@
+﻿@page "/TodosView"
+@using Domain.Models
+@using Domain.Contracts
+@inject ITodoHome TodoHome
+@inject NavigationManager _navMgr
+@using UIElements
+
+<h3>Todos</h3>
+
+<div class="filterbar">
+    <div class="filterscontainer">
+        
+        <td>
+            <label 
+                @onclick="OpenCloseFilters"
+                style="cursor:pointer;">
+                &#128270;
+            </label>
+        </td>
+        
+
+        @if (doShowFilters)
+        {
+            <div class="filter">
+                <div>
+                    <label>Owner ID:</label>
+                </div>
+                <div>
+                    <input type="number"
+                           class="owneridfield"
+                           @oninput="args => UpdateOwnerFilter(args)"
+                           min="0"/>
+                </div>
+            </div>
+            <div class="filter">
+                <div>
+                    <label style="text-align: center">Is completed?</label>
+                </div>
+                <div>
+                    <select class="completedstatusfield"
+                            @onchange="args => UpdateCompletedStatusFilter(args)">
+                        <option value="all">all</option>
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                    </select>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (todosToShow == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else if (!todosToShow.Any())
+{
+    <p>
+        <em>No ToDo items exist. Please add some.</em>
+    </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Owner ID</th> <th>Todo ID</th> <th>Title</th> <th>Completed?</th> <th>Remove</th> <th>Edit</th>
+
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in todosToShow)
+        {
+            <tr>
+                <td>@item.OwnerId</td> 
+                <td>@item.Id</td> 
+                <td>@item.Title</td> 
+                <td>
+                    <Toggle IsCompleted="@item.IsCompleted" Callback="@(b => ToggleStatus(b, item))"/>
+                </td>
+                
+                <td>
+                    <label 
+                        @onclick="@(() => RemoveTodo(item.Id))" 
+                        style="cursor:pointer; color: red; font-weight: bold">
+                        &#x2717;
+                    </label>
+                </td>
+                <td>
+                    <label @onclick="@(() => ShowEdit(item))"
+                    style="cursor:pointer; color: red; font-weight: bold">
+                        &#128295;
+                    </label>
+                </td>
+
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorLabel))
+{
+    <label style="color: red">@errorLabel</label>
+}
+
+<!-- EDIT POPUP WINDOW ----------------------------------------------------- edit ------------------------------------------------->
+
+@if (showModal)
+{
+    <Modal>
+        <h3>Edit Category</h3>
+        <hr/>
+        <div style="margin-bottom: 5px">
+            <label style="font-weight: bold">Todo Title</label>
+        </div>
+        <div style="margin-bottom: 5px">
+            <textarea style="width: 20ch; border-radius: 10px; padding: 3px;" @bind="@editedTitle"/>
+        </div>
+        <div style="margin-bottom: 5px">
+            <label style="font-weight: bold">Owner</label>
+        </div>
+        <div style="margin-bottom: 5px">
+            <input type="number" min="0" style="width: 10ch; border-radius: 10px; padding: 3px; text-align: center" @bind="@editedOwner"/>
+        </div>
+        @if (!string.IsNullOrEmpty(editErrorLabel))
+        {
+            <div>
+                <label style="color:red">@editErrorLabel</label>
+            </div>
+        }
+        <div style="margin-top: 15px">
+            <button style="margin-right: 10px" @onclick="AcceptEdit">Accept</button>
+            <button style="margin-left: 10px" @onclick="@(() => showModal = false)">Cancel</button>
+        </div>
+    </Modal>
+}
+
+<!-- EDIT POPUP WINDOW ----------------------------------------------------- edit ------------------------------------------------->
+
+@code {
+    private ICollection<Todo> allTodos, todosToShow;
+    private string errorLabel;
+
+    private int? ownerIdFilter;
+    private bool? isCompletedFilter;
+    private bool doShowFilters;
+    
+    private bool showModal;
+    private string editedTitle = String.Empty;
+    private int editedOwner;
+    private Todo todoToEdit = new();
+    
+    private string editErrorLabel = string.Empty;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        allTodos = await TodoHome.GetAsync();
+        todosToShow = allTodos;
+    }
+    
+    private async Task RemoveTodo(int id)
+    {
+        errorLabel = "";
+        try
+        {
+            Todo todoToRemove = todosToShow.First(todo => todo.Id == id);
+            await TodoHome.DeleteAsync(id);
+            todosToShow.Remove(todoToRemove);
+        }
+        catch (Exception e)
+        {
+            errorLabel = e.Message;
+        }
+    }
+    
+    // -------------------------------------------------- EDIT CODE ----------------------------------------------------
+
+
+    private void ShowEdit(Todo todo)
+    {
+        todoToEdit = todo;
+        editedOwner = todo.OwnerId;
+        editedTitle = todo.Title;
+        showModal = true;
+    }
+
+    private async Task AcceptEdit()
+    {
+        try
+        {
+            Todo updated = new()
+            {
+                Id = todoToEdit.Id,
+                Title = editedTitle,
+                IsCompleted = todoToEdit.IsCompleted,
+                OwnerId = editedOwner
+            };
+            await TodoHome.UpdateAsync(updated);
+            todoToEdit.Title = updated.Title;
+            todoToEdit.OwnerId = updated.OwnerId;
+            showModal = false;
+        }
+        catch (Exception e)
+        {
+            editErrorLabel = e.Message;
+        }
+    }
+    
+    private async Task ToggleStatus(bool status, Todo todo)
+    {
+        errorLabel = "";            
+        todo.IsCompleted = status;
+        try
+        {
+            await TodoHome.UpdateAsync(todo);
+        }
+        catch (Exception e)
+        {
+            errorLabel = e.Message;
+        }
+    }
+    // -------------------------------------------------- EDIT CODE ----------------------------------------------------
+
+    
+    // -------------------------------------------------- FILTERING ----------------------------------------------------
+    private void OpenCloseFilters()
+    {
+        doShowFilters = !doShowFilters;
+        if (!doShowFilters)
+        {
+            ownerIdFilter = null;
+            isCompletedFilter = null;
+            todosToShow = allTodos;
+        }
+    }
+    
+    private void UpdateOwnerFilter(ChangeEventArgs args)
+    {
+        string value = (string)args.Value;
+        if (string.IsNullOrEmpty(value))
+        {
+            ownerIdFilter = null;
+            ApplyFilters();
+            return;
+        }
+        int idFilter = int.Parse(value);
+        if (idFilter < 0)
+        {
+            return;
+        }
+    
+        ownerIdFilter = idFilter;
+        ApplyFilters();
+    }
+    
+    private void UpdateCompletedStatusFilter(ChangeEventArgs args)
+    {
+        string value = (string)args.Value;
+
+        try
+        {
+            isCompletedFilter = bool.Parse(value);
+        }
+        catch (Exception e)
+        {
+            isCompletedFilter = null;
+        }
+        ApplyFilters();
+    }
+    
+    private void ApplyFilters()
+    {
+        todosToShow = allTodos;
+        if (isCompletedFilter != null)
+        {
+            todosToShow = todosToShow.
+                Where(todo => todo.IsCompleted == isCompletedFilter).
+                ToList();
+        }
+        if (ownerIdFilter != null)
+        {
+            todosToShow = todosToShow.
+                Where(todo => todo.OwnerId == ownerIdFilter).
+                ToList();
+        }
+    }
+    // -------------------------------------------------- FILTERING ----------------------------------------------------
+
+    
+}

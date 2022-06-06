@@ -1,0 +1,38 @@
+﻿/* filters */
+.filterbar {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 5px;
+    display: inline-block;
+
+}
+
+.filterscontainer{
+    display: flex;
+}
+
+.filter {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 5px;
+    margin: 5px;
+    text-align: center;
+}
+
+.completedstatusfield {
+    width: 100px;
+    text-align: center;
+    font-size: large;
+    height: 30px;
+}
+
+.owneridfield {
+    width: 100px;
+    text-align: center;
+}
+
+.funnel{
+    width:30px;
+    height:30px;
+    cursor: pointer;
+}
